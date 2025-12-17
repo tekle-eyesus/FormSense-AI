@@ -3,8 +3,9 @@ import cv2
 import base64
 import numpy as np
 from app.geometry_utils import calculate_angle
+from mediapipe import solutions
 
-mp_pose = mp.solutions.pose
+mp_pose = solutions.pose
 
 class PoseDetector:
     def __init__(self):
