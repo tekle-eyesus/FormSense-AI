@@ -1,10 +1,15 @@
-import FitnessTracker from './components/FitnessTracker';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import LandingPage from './pages/LandingPage';
+import FitnessTracker from "./pages/TrackerPage";
 
 function App() {
   return (
-    <div className="dark min-h-screen bg-background text-foreground">
-      <FitnessTracker />
-    </div>
+    <Router>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/app" element={<FitnessTracker />} />
+      </Routes>
+    </Router>
   );
 }
 

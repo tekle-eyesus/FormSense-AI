@@ -14,8 +14,16 @@ const FitnessTracker = () => {
     // 1. Initialize WebSocket
     ws.current = new WebSocket("ws://localhost:8000/ws");
     
-    ws.current.onopen = () => setIsConnected(true);
-    ws.current.onclose = () => setIsConnected(false);
+    ws.current.onopen = () => {
+        console.log("WebSocket Connected");
+        setIsConnected(true);
+    };
+    
+    ws.current.onclose = () => {
+        console.log("WebSocket Disconnected");
+        setIsConnected(false);
+    };
+
 
     ws.current.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -33,7 +41,11 @@ const FitnessTracker = () => {
     // 2. Start Camera
     startCamera();
 
-    return () => ws.current.close();
+     return () => {
+        if (ws.current) {
+            ws.current.close();
+        }
+    };
   }, []);
 
   const startCamera = async () => {
