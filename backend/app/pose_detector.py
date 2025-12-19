@@ -1,61 +1,68 @@
-import mediapipe as mp
+from ultralytics import YOLO
 import cv2
 import base64
 import numpy as np
 from app.geometry_utils import calculate_angle
-from mediapipe import solutions
-
-mp_pose = solutions.pose
 
 class PoseDetector:
     def __init__(self):
-        self.pose = mp_pose.Pose(
-            static_image_mode=False,
-            model_complexity=1,
-            smooth_landmarks=True,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
-        )
+        # Load the "Nano" model (fastest for CPU)
+        # It will auto-download 'yolov8n-pose.pt' on first run
+        self.model = YOLO('yolov8n-pose.pt')
 
     def process_frame(self, base64_image):
-        # Decode the base64 string from Frontend to an Image
-        img_data = base64.b64decode(base64_image.split(',')[1])
-        nparr = np.frombuffer(img_data, np.uint8)
-        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        # 1. Decode image
+        try:
+            img_data = base64.b64decode(base64_image.split(',')[1])
+            nparr = np.frombuffer(img_data, np.uint8)
+            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        except:
+            return {"error": "Image decode failed"}
 
-        # Convert BGR (OpenCV standard) to RGB (MediaPipe standard)
-        image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        # 2. Run YOLO Inference
+        # verbose=False keeps the terminal clean
+        results = self.model(frame, verbose=False)
         
-        # Process
-        results = self.pose.process(image_rgb)
-        
-        feedback = "No body detected"
-        angle = 0
-        
-        # Extract Landmarks if found
-        if results.pose_landmarks:
-            landmarks = results.pose_landmarks.landmark
+        # Get image dimensions for normalization
+        height, width, _ = frame.shape
+
+        # 3. Extract Keypoints
+        # results[0].keypoints.data is a tensor of shape (1, 17, 3) -> (Batch, Points, x/y/conf)
+        if len(results) > 0 and results[0].keypoints.data.shape[1] > 0:
+            keypoints = results[0].keypoints.data[0].cpu().numpy()
             
-            # Get coordinates for Left Arm (Shoulder, Elbow, Wrist)
-            # MediaPipe Indexes: 11=Left Shoulder, 13=Left Elbow, 15=Left Wrist
-            shoulder = [landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].x,
-                        landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y]
-            elbow = [landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].x,
-                     landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].y]
-            wrist = [landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].x,
-                     landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y]
+            # YOLO COCO Keypoint Indices:
+            # 5: Left Shoulder
+            # 7: Left Elbow
+            # 9: Left Wrist
             
-            # Calculate angle
+            # Check confidence (index 2) to ensure detection is good
+            if keypoints[5][2] < 0.5 or keypoints[7][2] < 0.5 or keypoints[9][2] < 0.5:
+                return {"feedback": "Body not clear", "angle": 0, "landmarks": None}
+
+            # Extract (x, y) coordinates
+            # Note: YOLO returns pixel coordinates. We normalize them (0-1) 
+            # so the frontend drawing logic works exactly the same as before.
+            shoulder_px = keypoints[5][:2]
+            elbow_px = keypoints[7][:2]
+            wrist_px = keypoints[9][:2]
+
+            shoulder = [shoulder_px[0] / width, shoulder_px[1] / height]
+            elbow = [elbow_px[0] / width, elbow_px[1] / height]
+            wrist = [wrist_px[0] / width, wrist_px[1] / height]
+
+            # 4. Calculate Angle
             angle = calculate_angle(shoulder, elbow, wrist)
-            
-            # Simple Logic for Bicep Curl
+
+            # 5. Feedback Logic
+            feedback = "Hold..."
             if angle > 160:
                 feedback = "Arm Straight - Down"
-            elif angle < 30:
+            elif angle < 45: # Slightly adjusted for YOLO sensitivity
                 feedback = "Arm Curl - Up"
             else:
-                feedback = f"Moving... Angle: {int(angle)}"
-            
+                feedback = f"Moving... {int(angle)}°"
+
             return {
                 "angle": int(angle),
                 "feedback": feedback,
