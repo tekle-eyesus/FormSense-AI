@@ -1,9 +1,24 @@
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from app.pose_detector import PoseDetector
 import json
 
-app = FastAPI()
+# Global variable to hold the AI model
+detector = None
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global detector
+    print("---------------------------------------")
+    print("🚀 INFO: Initializing YOLOv8 Model...")
+    # Load the model here. This might take 5-10 seconds on first run.
+    detector = PoseDetector()
+    print("✅ INFO: Model Loaded successfully. Server is ready.")
+    print("---------------------------------------")
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -12,22 +27,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-detector = PoseDetector()
-
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    print("Client connected")
+    print(f"Client connected: {websocket.client}")
+    
     try:
         while True:
-            # Receive base64 image from frontend
             data = await websocket.receive_text()
             
-            # Process AI
-            result = detector.process_frame(data)
+            # Use the global detector
+            if detector:
+                result = detector.process_frame(data)
+                await websocket.send_json(result)
+            else:
+                await websocket.send_json({"error": "Model still loading"})
             
-            # Send result back
-            await websocket.send_json(result)
-            
+    except WebSocketDisconnect:
+        print("Client disconnected")
     except Exception as e:
-        print(f"Connection closed: {e}")
+        print(f"Error: {e}")
