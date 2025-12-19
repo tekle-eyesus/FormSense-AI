@@ -1,12 +1,19 @@
 export const drawLandmarks = (ctx, landmarks) => {
     if (!landmarks) return;
+    ctx.strokeStyle = '#a855f7';
+    ctx.lineWidth = 4;
+    ctx.shadowColor = '#d8b4fe';
+    ctx.shadowBlur = 10;
 
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = '#ffffff';
     const connections = [
         ['shoulder', 'elbow'],
         ['elbow', 'wrist']
     ];
 
-    // Draw Lines (Bones)
     ctx.strokeStyle = '#fcf40a';
     ctx.lineWidth = 4;
 

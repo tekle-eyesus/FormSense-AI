@@ -1,6 +1,12 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
+@import "tailwindcss";
 @theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  
+  /* This creates a new utility 'font-heading' */
+  --font-heading: "Outfit", sans-serif;
+
   --color-background: hsl(240 10% 3.9%);
   --color-foreground: hsl(0 0% 98%);
 
@@ -15,7 +21,16 @@
   --radius-md: 0.5rem;
 }
 
+/* 4. Base Styles */
+:root {
+  /* Define the raw HSL values for the variables above if they use var(--...) internally */
+  /* If you are just using standard tailwind colors, you can skip detailed HSL mapping here unless Shadcn needs them */
+  --background: 240 10% 3.9%;
+  --foreground: 0 0% 98%;
+}
+
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);
+  font-family: var(--font-sans); /* Applies Jakarta Sans globally */
 }
